@@ -90,7 +90,7 @@ ner_configs = {
         #'raw_data_path': Ner_Dir / 'dataset/raw/temp.txt',
         'train_path' : Ner_Dir / 'dataset/raw/temp.txt',
         'valid_path' : Ner_Dir / 'dataset/raw/temp2.txt',
-        'test_path': Ner_Dir / 'dataset/raw/temp2.txt',
+        'test_path': Ner_Dir / 'dataset/raw/test.txt',
         'dataset':'Conll2003',
 
     },

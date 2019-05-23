@@ -58,12 +58,10 @@ class Predictor(object):
             batch = (input_ids,token_type_ids,attention_mask)
             batch = tuple(torch.LongTensor(t).to(self.device).view(1,-1) for t in batch)
         else:
-            debug_words = textA.split()
-            words = textA.split()
+            words = ['[CLS]']+textA.split()[:254]+['[SEP]']
             input_ids,l_is_begin,attention_mask = [],[],[]
             for w in words:
                 tokens = self.tokenizer.tokenize(w) if w not in ("[CLS]", "[SEP]") else [w]
-
                 tokenids = self.tokenizer.convert_tokens_to_ids(tokens)
                 is_begin = [1] + [0]*(len(tokens)-1)
                 input_masks = [1]*len(tokenids)
@@ -143,10 +141,11 @@ class NerPredictor(Predictor):
         self.metrics = [F1Score(average='micro',task_type='multiclass',normalizate=False,only_head=True)]
         self.criterion = criterion
         super(NerPredictor,self).__init__(model,logger,model_path,config)
+        self.ner2id = {n:i for i,n in enumerate(config['Ner'])}
 
     def predict(self,textA):
         self.model.eval()
-        debug_words = textA.split()
+        words = ['[CLP]']+textA.split()[:254]+['[SEP]']
         id2ner  = {i:n for i,n in enumerate(self.config['Ner'])}
         with torch.no_grad():
             batch =   self.PreprocessText(textA)
@@ -177,54 +176,49 @@ class NerPredictor(Predictor):
                 if ners[i]=='<PAD>' or  ners[i]=='O':
                     i+=1
                     continue
-                if ners[i] == 'B-PER':
-                    #word += self.tokenizer.convert_ids_to_tokens(input_ids[i])
+                elif ners[i] == 'B-PER':
                     for j in range(i+1,n+1):
-                        if ners[j]in['I-PER','B-PER']:
-                            #word += self.tokenizer.convert_ids_to_tokens(input_ids[j])
+                        if 'I' in ners[j]:
                             continue
                         else:
-                            word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[pos[a]:pos[a+1]]))
-                                             for a in range(i,j)])
+                            #word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[pos[a]:pos[a+1]]))
+                            #                 for a in range(i,j)])
+                            word = ' '.join([words[i] for i in range(i,j)])
                             i =j
                             output['PER'].append(word)
                             break
-                if ners[i] == 'B-LOC':
+                elif ners[i] == 'B-LOC':
                     #word += self.tokenizer.convert_ids_to_tokens(input_ids[i])
                     for j in range(i+1,n):
-                        if ners[j]in['I-LOC','B-LOC']:
-                            #word += self.tokenizer.convert_ids_to_tokens(input_ids[j])
+                        #if ners[j]in['I-LOC','B-LOC']:
+                        if 'I' in ners[j]:
                             continue
                         else:
-                            word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[pos[a]:pos[a+1]]))
-                                             for a in range(i,j)])
+                            word = ' '.join([words[i] for i in range(i,j)])
                             i =j
                             output['LOC'].append(word)
                             break
-                if ners[i] == 'B-MISC':
-                    #word += self.tokenizer.convert_ids_to_tokens(input_ids[i])
+                elif ners[i] == 'B-MISC':
                     for j in range(i+1,n):
-                        if ners[j]in['I-MISC','B-MISC']:
-                            #word += self.tokenizer.convert_ids_to_tokens(input_ids[j])
+                        if 'I' in ners[j]:
                             continue
                         else:
-                            word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[pos[a]:pos[a+1]]))
-                                             for a in range(i,j)])
+                            word = ' '.join([words[i] for i in range(i,j)])
                             i =j
                             output['MISC'].append(word)
                             break
-                if ners[i] == 'B-ORG':
-                    #word += self.tokenizer.convert_ids_to_tokens(input_ids[i])
+                elif ners[i] == 'B-ORG':
                     for j in range(i+1,n):
-                        if ners[j]in['I-ORG','B-ORG']:
-                            #word += self.tokenizer.convert_ids_to_tokens(input_ids[j])
+                        #if ners[j]in['I-ORG','B-ORG']:
+                        if 'I' in ners[j]:
                             continue
                         else:
-                            word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[pos[a]:pos[a+1]]))
-                                             for a in range(i,j)])
+                            word = ' '.join([words[i] for i in range(i,j)])
                             i =j
                             output['ORG'].append(word)
                             break
+                else:
+                    i+=1
 
         return logits,output
 
@@ -250,6 +244,7 @@ class NerPredictor(Predictor):
                 self.show_info(step,n_batch)
                 self.outputs.append(logits.cpu().detach())
                 self.targets.append(y.cpu().detach())
+
             self.outputs = torch.cat(self.outputs,dim=0).cpu().detach()
             self.targets = torch.cat(self.targets,dim=0).cpu().detach()
             loss = self.criterion(target= self.targets,logits = self.outputs)
@@ -280,7 +275,7 @@ class BIOPredictor(Predictor):
 
     def predict(self,textA):
         self.model.eval()
-        debug_words = textA.split()
+        words = ['[CLP]']+textA.split()[:254]+['[SEP]']
         id_ner  = {i:n for i,n in enumerate(self.config['Ner'])}
         ner2id = {n:i for i,n in enumerate(self.config['Ner'])}
         with torch.no_grad():
@@ -299,73 +294,111 @@ class BIOPredictor(Predictor):
             logits = logits.view(logits.size(1),logits.size(2)).softmax(-1).cpu().detach().numpy()
             pos = [i for i,_ in enumerate(input_ids) if is_heads[i]==1]
 
-            ori_pos= pos
-            #logits = ori_logits[pos]
-            pos = ori_pos+[len(logits)]
 
+            logits = logits[pos]
+            r,c = logits.shape
             pos_v,pos_arg0,pos_arg1,pos_arg2 = -1,-1,-1,-1
             output = {'V':'','ARG0':'','ARG1':'','ARG2':''}
             des = ''
 
+            pos = pos+[len(logits)]
+            n = len(pos)
+            '''
             if np.max(logits[...,ner2id['V']]) >0:
                 pos_v = logits[pos[:-1],ner2id['V']].argmax()
             if pos_v>0:
-                n= len(pos)-1
-                for j in range(pos_v+1,n+1):
-                        if j<n and ners[j] in ['V']:
+                #n= len(pos)
+                for j in range(pos_v+1,n):
+                        if j<n-1 and ners[j] in ['V']:
                             continue
                         else:
-                            word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[pos[a]:pos[a+1]]))
-                                             for a in range(pos_v,j)])
-                            pos = [pos[i] for i in range(n) if i not in range(pos_v,j)]
-                            #logits = ori_logits[pos]
+                            word = ' '.join([words[i] for i in range(pos_v,j)])
+                            debug_l  = range(ori_pos[pos_v],ori_pos[j])
+                            pos = [i for i in pos if i not in debug_l]
                             output['V']=  word
                             break
             if np.max(logits[...,ner2id['B-ARG0']]) >0:
-                pos_arg0 = logits[pos[:-1],ner2id['B-ARG0']].argmax()
+                debug_logit = logits[pos[:-1],ner2id['B-ARG0']]
+                pos_arg0 = debug_logit.argmax()
             if pos_arg0>0:
-                n= len(pos)-1
-                for j in range(pos_arg0+1,n+1):
-                        if ners[j] in ['I-ARG0']:
+                #n= len(pos)
+                for j in range(pos_arg0+1,n):
+                        if j<n-1 and ners[j] in ['I-ARG0']:
                             continue
                         else:
-                            word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[pos[a]:pos[a+1]]))
-                                             for a in range(pos_arg0,j)])
-                            pos = [pos[i] for i in range(n) if i not in range(pos_v,j)]
-                            #logits = ori_logits[pos]
+                            #word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[ori_pos[a]:ori_pos[a+1]]))
+                            #                for a in range(pos_arg0,j)])
+                            word = ' '.join([words[i] for i in range(pos_arg0,j)])
+                            debug_l  = range(ori_pos[pos_v],ori_pos[j])
+                            pos = [i for i in pos if i not in range(ori_pos[pos_arg0],ori_pos[j])]
                             output['ARG0']=  word
                             break
             if np.max(logits[...,ner2id['B-ARG1']]) >0:
                 pos_arg1 = logits[pos[:-1],ner2id['B-ARG1']].argmax()
             if pos_arg1>0:
-                n= len(pos)-1
+                #n= len(pos)
                 for j in range(pos_arg1+1,n):
-                        if ners[j] in ['I-ARG1']:
+                        if j<n-1 and  ners[j] in ['I-ARG1']:
                             continue
                         else:
-                            word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[pos[a]:pos[a+1]]))
-                                             for a in range(pos_arg1,j)])
-                            pos = [pos[i] for i in range(n) if i not in range(pos_v,j)]
-                            #logits = ori_logits[pos]
+                            #word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[ori_pos[a]:ori_pos[a+1]]))
+                            #                 for a in range(pos_arg1,j)])
+                            word = ' '.join([words[i] for i in range(pos_arg1,j)])
+                            pos = [i for i in pos if i not in range(ori_pos[pos_arg1],ori_pos[j])]
                             output['ARG1']=  word
                             break
             if np.max(logits[...,ner2id['B-ARG2']]) >self.threshold:
                 pos_arg2 = logits[pos[:-1],ner2id['B-ARG2']].argmax()
             if pos_arg2>0:
-                n= len(pos)-1
+                #n= len(pos)
                 for j in range(pos_arg2+1,n):
-                        if ners[j] in ['I-ARG2']:
+                        if j<n-1 and ners[j] in ['I-ARG2']:
                             continue
                         else:
-                            word = ' '.join([''.join(self.tokenizer.convert_ids_to_tokens(input_ids[pos[a]:pos[a+1]]))
-                                             for a in range(pos_arg2,j)])
-                            pos = [pos[i] for i in range(n) if i not in range(pos_v,j)]
+                            word = ' '.join([words[i] for i in range(pos_arg2,j)])
+                            pos = [i for i in pos if i not in range(ori_pos[pos_arg2],ori_pos[j])]
                             logits = logits[pos]
                             output['ARG2']=  word
                             break
-        des = ' '.join([output['V'],output['ARG0'],output['ARG1'],output['ARG2']])
-        print(des)
+            '''
+            ignore = []
+            pos_v = logits[...,ner2id['V']].argmax()
+            ignore.append(pos_v)
+            debug_l  =[i for i in range(r)if i not in ignore]
+            pos_arg0 = logits[debug_l,ner2id['B-ARG0']].argmax()
+            ignore.append(pos_arg0)
+            debug_l  =[i for i in range(r)if i not in ignore]
+            pos_arg1 = logits[debug_l,ner2id['B-ARG1']].argmax()
+            if pos_v>0:
+                for j in range(pos_v+1,n):
+                        if j<n-1 and ners[j] in ['V']:
+                            continue
+                        else:
+                            word = ' '.join([words[i] for i in range(pos_v,j)])
+                            words.pop(pos_v)
+                            output['V']=  word
+                            break
+            if pos_arg0>=0:
+                for j in range(pos_arg0+1,n):
+                        if j<n-1 and ners[j] in ['I-ARG0']:
+                            continue
+                        else:
+                            word = ' '.join([words[i] for i in range(pos_arg0,j)])
+                            words.pop(pos_arg0)
+                            output['ARG0']=  word
+                            break
+            if pos_arg1>=0:
+                for j in range(pos_arg1+1,n):
+                        if j<n-1 and  ners[j] in ['I-ARG1']:
+                            continue
+                        else:
+                            word = ' '.join([words[i] for i in range(pos_arg1,j)])
+                            output['ARG1']=  word
+                            break
+        des = ' '.join([output['ARG0'],output['V'],output['ARG1'],output['ARG2']])
+        #print(des)
         return logits,output,des
+
     def show_info(self,batch_id,n_batch):
         recv_per = int(100 * (batch_id + 1) / n_batch)
         show_bar = f"\r[predict]{batch_id+1}/{n_batch}[{int(self.width * recv_per / 100) * '>':<{self.width}s}]{recv_per}%"

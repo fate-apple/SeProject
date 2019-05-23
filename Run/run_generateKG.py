@@ -13,6 +13,7 @@ import pymongo
 import argparse
 import torch.nn.functional as F
 import re
+import tqdm
 
 
 def is_causality(textA,textB,mnli_predictor):
@@ -32,6 +33,8 @@ def extract_event(textA,ner_predictor,bio_predictor):
     event['Arg'] = output
     event['Des'] =des
     event['V'] = st.stem(output['V'])
+    l =event['Ner'].values()
+    print(f"raw : {textA}\n Ner : {' '.join([' '.join(i) for i in l])}   Des : {des}")
     return event
 
 def meet_ignore(str1,str2):
@@ -60,7 +63,7 @@ def main():
                         help="start of the data")
     args = parser.parse_args()
 
-    EventCollection = pymongo.MongoClient().EcProject.Event
+    EventCollection = pymongo.MongoClient().EcProject.Event2
     CausalityCollection = pymongo.MongoClient().EcProject.Causality
     count = EventCollection.find().count()
     device = f"cuda: 0"
@@ -126,13 +129,12 @@ def main():
 
             #sentences.extend(l)
 
-    for i in range(len(sentences)-1):
+    for i in tqdm.tqdm(range(len(sentences)-1)):
         textA = sentences[i]
         textB = sentences[i+1]
         if is_causality(textA=textA,textB=textB,mnli_predictor=mnli_predicter):
             EventA = extract_event(textA,ner_predicter,bio_predicter)
             EventB = extract_event(textB,ner_predicter,bio_predicter)
-            #collection.update_one({'Ner':EventA['Ner'],'V':EventA['V']}, {"$push": {'cause'}}, upsert=True)
             _idA = EventCollection.find_one({'Ner':EventA['Ner'],'V':EventA['V']})
             _idB = EventCollection.find_one({'Ner':EventB['Ner'],'V':EventB['V']})
 
@@ -152,6 +154,65 @@ def main():
 
 #def preprocess(p):
 
+def test():
+    os.chdir(os.path.pardir)
+    print(os.path.pardir)
+    parser = argparse.ArgumentParser()
+    ## Required parameters
+    parser.add_argument("--data",
+                        default="wiki",
+                        type=str,
+                        required=True,
+                        help="choose raw data: wikipedia,")
+    ## Other parameters
+    parser.add_argument("--startword",
+                        default=None,
+                        type=str,
+                        help="start of the data")
+    args = parser.parse_args()
+
+    EventCollection = pymongo.MongoClient().EcProject.Event
+    CausalityCollection = pymongo.MongoClient().EcProject.Causality
+    count = EventCollection.find().count()
+    device = f"cuda: 0"
+    #----------------logger----------------
+    logger = init_logger(log_name = 'generateKG',log_dir = 'log_dir')
+    logger.info(f'device    :   {device}')
+
+    config = Mnli_configs
+    model = Bert_Mnli_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['mnli_model_dir'],
+                                         cache_dir = config['output']['cache_dir'],
+                                          num_classes = len(config['Labels']))
+    mnli_predicter = MnliPredictor(model = model,
+                            logger = logger,
+                              model_path=None,
+                              config=config,
+                              criterion= None
+                         )
+
+    config = ner_configs
+    model = Bert_Ner_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['bert_model_dir'],
+                                          cache_dir = config['output']['cache_dir'],
+                                          num_classes = len(config['Ner']))
+    ner_predicter = NerPredictor(model = model,
+                              logger = logger,
+                              model_path = config['output']['checkpoint_dir'] / f"best_{config['model']['arch']}_model.pth",
+                              config=config,
+                              criterion= None
+                         )
+
+    config = BIO_configs
+    model = Bert_Ner_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['bert_model_dir'],
+                                          cache_dir = config['output']['cache_dir'],
+                                          num_classes = len(config['Ner']))
+    bio_predicter = BIOPredictor(model = model,
+                              logger = logger,
+                              model_path = config['output']['checkpoint_dir'] / f"best_{config['model']['arch']}_model.pth",
+                              config=config,
+                              criterion= None
+                         )
+    test_str  ='[CLP] The United States Thursday blasted the release from a Greek prison of a Palestinian guerrilla convicted of bombing an airliner and killing a teenager in 1982 , saying the move " does not make sense . [SEP]'
+    EventA = extract_event(test_str,ner_predicter,bio_predicter)
 
 if __name__ == '__main__':
     main()
