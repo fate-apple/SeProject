@@ -270,7 +270,7 @@ BIO_configs = {
     },
     'output':{
         'log_dir': BIO_Dir / 'output/log',
-        'checkpoint_dir' :  BIO_Dir/ "output/checkpoints/1",
+        'checkpoint_dir' :  BIO_Dir/ "output/checkpoints/3",
         'cache_dir':  BIO_Dir/ "output/model_cache",
         'figure_dir': BIO_Dir/ "output/fighre",
         'result': BIO_Dir / "output/result",
@@ -282,7 +282,7 @@ BIO_configs = {
 
     },
     'data':{
-        'train_path' :BIO_Dir / 'dataset/processed/BIOtemp.txt',
+        'train_path' :BIO_Dir / 'dataset/processed/BIOtrain.txt',
         'valid_path' :BIO_Dir / 'dataset/processed/BIOdevelopment.txt',
         'test_path' :BIO_Dir / 'dataset/processed/BIOtest.txt',
     },
@@ -292,12 +292,11 @@ BIO_configs = {
         'learning_rate':5e-5,
         'gradient_accumulation_steps': 1,
         'warmup_proportion':0.1,
-        #'resume':'Ner/output/checkpoints/best_bert_ner_model.pth',
         'resume':False,
         'epochs':3,
         'early_stop':None,
         'do_lower_case':True,
-        'batch_size':4,
+        'batch_size':8,
     },
     'Ner':['<PAD>', 'O','V','B-ARG0','I-ARG0','B-ARG1','I-ARG1','B-ARG2','I-ARG2'],
 

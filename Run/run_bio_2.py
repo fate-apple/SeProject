@@ -1,26 +1,25 @@
 #encoding: utf-8
 '''
-@time: 2019/5/5 21:42
-@desc: just trian ner model for test
+@time: 2019/5/23 18:50
+@desc:
 '''
-
 import torch
 import os
 import warnings
 
 from pytorch_pretrained_bert.optimization import BertAdam
 from Pybert.utils.utils import seed_everything
-from Config.BasicConfig import ner_configs as config
-from Data.PrepareDL import PreNerDL,PreNerDL_test
+from Config.BasicConfig import BIO_configs as config
+from Data.PrepareDL import PreBIODL_2,PreBIODL_test
 from Pybert.utils.logger import init_logger
-from Pybert.model.nn.bert_finetune import Bert_Ner_Finetune
+from Pybert.model.nn.bert_finetune import Bert_BIO_Finetune
 from Pybert.callback.model_checkpoint import Model_Checkpoint
 from Pybert.callback.training_monitor import TrainingMonitor
 from Pybert.callback.lr_scheduler import BertLR
-from Pybert.train.metric import  F1Score,MultiLabelReport,AccuracyThresh
-from Pybert.train.Trainer import LabelTrainer,NerTrainer
+from Pybert.train.metric import  F1Score
+from Pybert.train.Trainer import BioTrainer
 from Pybert.train.losses import CrossEntropy
-from Pybert.Predictor import NerPredictor
+from Pybert.Predictor import BIOPredictor
 warnings.filterwarnings("ignore")
 
 def main():
@@ -36,14 +35,14 @@ def main():
 
     #----------------Prepare Data----------------
     #label_train_loader ,label_valid_loader  = PreLabelDL()
-    ner_train_loader,ner_valid_loader = PreNerDL(logger,config)
+    ner_train_loader,ner_valid_loader = PreBIODL_2(logger,config)
 
     #----------------Model----------------
     logger.info('Initializing Model')
-    id2ner = {index:label for index,label in enumerate(config['Ner'])}
-    model = Bert_Ner_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['bert_model_dir'],
-                                          cache_dir = config['output']['cache_dir'],
-                                          num_classes = len(config['Ner']))
+    #id2ner = {index:label for index,label in enumerate(config['Ner'])}
+    model = Bert_BIO_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['bert_model_dir'],
+                                              cache_dir = config['output']['cache_dir'],
+                                                )
 
     #----------------Optimizer----------------
     param_optimizer = list(model.named_parameters())#Returns an iterator over module parameters, yielding both the  name of the parameter as well as the parameter itself.
@@ -88,23 +87,18 @@ def main():
                     'epochs':config['train']['epochs'],
                     'resume':config['train']['resume'],
                     'gradient_accumulation_steps':config['train']['gradient_accumulation_steps'],
-                    #'epoch_metrics' : [F1Score(average='micro',task_type='multiclass'),MultiLabelReport(id2label=id2ner)],
-                     'epoch_metrics' : [F1Score(average='micro',task_type='multiclass',normalizate=False,only_head=False),
-                                        F1Score(average='micro',task_type='multiclass',normalizate=False,only_head=True)],
+                    # 'epoch_metrics' : [F1Score(average='micro',task_type='multiclass',normalizate=False,only_head=False),
+                    #                    F1Score(average='micro',task_type='multiclass',normalizate=False,only_head=True)],
+                    'epoch_metrics'  : [],
                     'batch_metrics' : [],
                     'criterion': CrossEntropy(),
                     'early_stop' : config['train']['early_stop'],
                     'verbose' : 1      }
-    ner_trainer = NerTrainer(train_configs = train_configs)
-    ner_trainer.train(train_data = ner_train_loader,valid_data= ner_valid_loader)
+    bio_trainer = BioTrainer(train_configs = train_configs)
+    bio_trainer.train(train_data = ner_train_loader,valid_data= ner_valid_loader)
 
     if device!= 'cpu':
         torch.cuda.empty_cache()
-
-
-
-
-    print('debug')
 
 def test():
 
@@ -118,11 +112,11 @@ def test():
     seed_everything(seed = config['common']['seed'],device=device)
     logger.info('load data from disk')
 
-    test_loader = PreNerDL_test(logger,config)
-    model = Bert_Ner_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['bert_model_dir'],
+    test_loader = PreBIODL_test(logger,config)
+    model = Bert_BIO_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['bert_model_dir'],
                                          cache_dir = config['output']['cache_dir'],
-                                          num_classes = len(config['Labels']))
-    predicter = NerPredictor(model = model,
+                                          num_classes = len(config['Ner']))
+    predicter = BIOPredictor(model = model,
                             logger = logger,
                             model_path = config['output']['checkpoint_dir'] / f"best_{config['model']['arch']}_model.pth",
                               config=config,

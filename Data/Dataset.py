@@ -216,6 +216,79 @@ class MnliDataset(Dataset):
 
         return input_ids,token_type_ids,attention_mask,y
 
+class BIODataset(Dataset):
+    def __init__(self,data,max_seq_len,seed=0,example_type='Unk',
+                 tokenizer=BertTokenizer.from_pretrained('bert-base-cased', do_lower_case=False)):
+        self.l_words,self.l_ners = data
+        self.max_seq_len = max_seq_len
+        self.seed = seed
+        self.tokenizer = tokenizer
+        self.example_type = example_type
+
+    def __len__(self):
+        return len(self.l_words)
+    def __getitem__(self, index):
+        words,ners = self.l_words[index],self.l_ners[index]
+        input_ids,token_type_ids,attention_mask,l_is_begin = [],[],[],[]
+        l_tags =[]
+        for w,n in zip(words,ners):
+            tokens = self.tokenizer.tokenize(w) if w not in ("[CLS]", "[SEP]") else [w]
+            tokenids = self.tokenizer.convert_tokens_to_ids(tokens)
+            is_begin = [1] + [0]*(len(tokens)-1)
+            tags = [n]*len(tokens)
+            input_masks = [1]*len(tokenids)
+
+            input_ids.extend(tokenids)
+            attention_mask.extend(input_masks)
+            l_is_begin.extend(is_begin)
+            l_tags.extend(tags)
+        token_type_ids = None
+        seq_len = len(input_ids)
+
+        pos_v = l_tags.index('V')
+        pos_arg0 = l_tags.index('B-ARG0')
+        try:
+            pos_arg1 = l_tags.index('B-ARG1')
+        except:
+            print('debug')
+        for j in range(pos_arg0+1,seq_len+1):
+            if j<seq_len and l_tags[j] in ['B-ARG0','I-ARG0']:
+                j+=1
+                continue
+            else :
+                pos_arg0_end =  j
+                break
+        for j in range(pos_arg1+1,seq_len+1):
+            if j<seq_len and l_tags[j] in ['B-ARG1','I-ARG1']:
+                j+=1
+                continue
+            else :
+                pos_arg1_end =  j
+                break
+        y = [pos_v,pos_arg0,pos_arg0_end,pos_arg1,pos_arg1_end]
+
+        sentence = ' '.join(words)
+        return input_ids,token_type_ids,attention_mask,y,l_is_begin,sentence,seq_len
+
+    def pad(batch):
+        f = lambda x: [sample[x] for sample in batch]
+        seqlens = f(-1)
+        y = f(3)
+        max_seq_len = np.array(seqlens).max()
+
+        f = lambda x, seqlen: [sample[x] + [0] * (max_seq_len - len(sample[x])) for sample in batch]
+        g= torch.LongTensor
+        input_ids = g(f(0,max_seq_len))
+        #token_type_ids = g(f(1,max_seq_len))
+        attention_mask = g(f(2,max_seq_len))
+        l_is_begin = g(f(4,max_seq_len))
+        y = g(y)
+        token_type_ids = torch.zeros_like(input_ids)
+
+        return (input_ids,token_type_ids,attention_mask,y,l_is_begin)
+
+
+
 
 
 

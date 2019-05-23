@@ -352,8 +352,8 @@ class ontonotes5DT(DataTransformer):
         for entry in entries:
             words = [line.split()[0] for line in entry.splitlines()]
             ners = [line.split()[-1] for line in entry.splitlines()]
-            l_words.append(['[CLS]']+words+['[SEP]'])
-            l_ners.append(['<PAD>']+ners+['<PAD>'])
+            l_words.append(['[CLS]']+words[:254]+['[SEP]'])
+            l_ners.append(['<PAD>']+ners[:254]+['<PAD>'])
         return (l_words,l_ners)
 
 

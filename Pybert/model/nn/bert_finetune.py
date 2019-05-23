@@ -94,3 +94,35 @@ class Bert_Mnli_Finetune(BertPreTrainedModel):
         y_hat = logits.argmax(-1)
         return logits
 
+class Bert_BIO_Finetune(BertPreTrainedModel):
+    def __init__(self,bertConfig):
+
+        super(Bert_BIO_Finetune,self).__init__(bertConfig)
+        self.bert = BertModel(bertConfig)
+        '''
+        self.output_v = nn.Linear(768, 1)
+        self.output_arg0 = nn.Linear(768, 2)
+        self.output_arg1 = nn.Linear(768, 2)
+        '''
+        self.output = nn.Linear(768, 5)
+        self.apply(self.init_bert_weights)
+        self.unfreeze_bert_encoder()
+
+    def unfreeze_bert_encoder(self):
+        for p in self.bert.parameters():
+            p.requires_grad = True
+
+    def forward(self,input_ids,token_type_ids=None,attention_mask=None,y =None,output_all_encodedLayers = False):
+        #if token_type_ids is None:
+        #    token_type_ids = torch.zeros_like(input_ids)
+        # We "pool" the model by simply taking the hidden state corresponding
+        # to the first token.
+
+        #Debug: Don't use 'input_ids=' , send to __call__ as **kwargs
+        encoded_layer,pooled_output = self.bert(input_ids,token_type_ids,attention_mask,
+                                                output_all_encoded_layers = False
+                                                )
+        logits = self.output(encoded_layer)
+        logits= tuple(logit.squeeze(-1) for logit in logits.split(1, dim=-1))
+        v_logits,arg0_start_logits,arg0_end_logits,arg1_start_logits,arg1_end_logits=logits
+        return [v_logits,arg0_start_logits,arg0_end_logits,arg1_start_logits, arg1_end_logits]

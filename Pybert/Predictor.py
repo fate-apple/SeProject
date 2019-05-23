@@ -275,7 +275,7 @@ class BIOPredictor(Predictor):
 
     def predict(self,textA):
         self.model.eval()
-        words = ['[CLP]']+textA.split()[:254]+['[SEP]']
+        words = textA.split()[:254]
         id_ner  = {i:n for i,n in enumerate(self.config['Ner'])}
         ner2id = {n:i for i,n in enumerate(self.config['Ner'])}
         with torch.no_grad():
@@ -287,8 +287,8 @@ class BIOPredictor(Predictor):
             is_heads = is_heads.view(-1).tolist()
             input_ids = input_ids.view(-1).tolist()
 
-            #is_heads[0]=0
-            #is_heads[-1]=0
+            is_heads[0]=0
+            is_heads[-1]=0
             y_hat = [hat for head, hat in zip(is_heads, y_hat) if head == 1]
             ners= [id_ner[i] for i in y_hat]
             logits = logits.view(logits.size(1),logits.size(2)).softmax(-1).cpu().detach().numpy()
@@ -376,20 +376,27 @@ class BIOPredictor(Predictor):
                         else:
                             word = ' '.join([words[i] for i in range(pos_v,j)])
                             words.pop(pos_v)
+                            logits = logits[[i for i in range(n-1) if i != pos_v],...]
                             output['V']=  word
+                            n-=1
                             break
-            if pos_arg0>=0:
-                for j in range(pos_arg0+1,n):
-                        if j<n-1 and ners[j] in ['I-ARG0']:
-                            continue
-                        else:
-                            word = ' '.join([words[i] for i in range(pos_arg0,j)])
-                            words.pop(pos_arg0)
-                            output['ARG0']=  word
-                            break
+            try:
+                if pos_arg0>=0:
+                    for j in range(pos_arg0+1,n):
+                            if j<n-1 and logits[j,ner2id['I-ARG0']]>0.25:
+                                continue
+                            else:
+                                word = ' '.join([words[i] for i in range(pos_arg0,j)])
+                                words.pop(pos_arg0)
+                                logits = logits[[i for i in range(n-1) if i != pos_arg0],...]
+                                output['ARG0']=  word
+                                n-=1
+                                break
+            except :
+                print('debug')
             if pos_arg1>=0:
                 for j in range(pos_arg1+1,n):
-                        if j<n-1 and  ners[j] in ['I-ARG1']:
+                        if j<n-1 and logits[j,ner2id['I-ARG1']]>0.25:
                             continue
                         else:
                             word = ' '.join([words[i] for i in range(pos_arg1,j)])

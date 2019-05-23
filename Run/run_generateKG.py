@@ -38,7 +38,7 @@ def extract_event(textA,ner_predictor,bio_predictor):
     return event
 
 def meet_ignore(str1,str2):
-    if len(str2)<10:
+    if len(str2)<30:
         return True
     if re.match(r'\d',str1[-1]) and re.match(r'\d',str2[0]):
         return True

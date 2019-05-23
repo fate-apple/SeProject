@@ -263,6 +263,42 @@ def PreBIODL(logger,config):
                               )
     return train_loader,valid_loader
 
+def PreBIODL_2(logger,config):
+    ner2idx = {ner:idx for idx,ner in enumerate(config['Ner'])}
+    tokenizer = BertTokenizer(vocab_file=config['model']['pretrained']['bert_vocab_path'],
+                              do_lower_case=config['train']['do_lower_case'])
+    DT = ontonotes5DT(logger,seed=config['common']['seed'])
+    train_data = DT.read_data(path=config['data']['train_path'])
+    valid_data = DT.read_data(path=config['data']['valid_path'])
+
+    train_dataset = BIODataset(data = train_data,
+                               tokenizer=tokenizer,
+                               max_seq_len = config['train']['max_seq_len'],
+                               seed = config['common']['seed'],
+                               example_type = 'train'
+                               )
+    valid_dataset = BIODataset(data = valid_data,
+                               tokenizer=tokenizer,
+                               max_seq_len = config['train']['max_seq_len'],
+                               seed = config['common']['seed'],
+                               example_type = 'train'
+                               )
+    train_loader = DataLoader(dataset=train_dataset,
+                              batch_size = config['train']['batch_size'],
+                              shuffle=True,
+                              num_workers= config['common']['num_workers'],
+                               pin_memory=False,
+                              collate_fn=BIODataset.pad
+                              )
+    valid_loader = DataLoader(dataset=valid_dataset,
+                              batch_size = config['train']['batch_size'],
+                              shuffle=False,
+                              num_workers= config['common']['num_workers'],
+                              pin_memory=False,
+                              collate_fn=BIODataset.pad
+                              )
+    return train_loader,valid_loader
+
 def PreBIODL_test(logger,config):
     ner2idx = {ner:idx for idx,ner in enumerate(config['Ner'])}
     tokenizer = BertTokenizer(vocab_file=config['model']['pretrained']['bert_vocab_path'],
