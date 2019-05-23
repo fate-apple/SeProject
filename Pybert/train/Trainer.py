@@ -452,6 +452,7 @@ class BioTrainer(Trainer):
         self.epoch_reset()
         self.model.train()
         total_loss = [0]*5
+        valid_loss =0
         for step,batch in tqdm.tqdm(enumerate(data)):
             start = time.time()
             self.batch_reset()
@@ -488,17 +489,24 @@ class BioTrainer(Trainer):
                 self.global_step +=1
 
             self.info['loss'] = loss.item()
+            if step==0:
+                    valid_loss = loss
+            else:
+                    valid_loss += loss
             if self.verbose>0:
                 self.progressbar.step(index=step,info=self.info,use_time=time.time()-start)
             #self.is_head.append(is_heads.view(-1).cpu().detach())
 
         print(f"\n{'-'*25} train result : {'-'*25}")
-        #self.is_head = torch.cat(self.is_head,dim=0).cpu().detach()
+
+
 
         for i in range(5):
             loss = total_loss[i]
             self.result[f'loss{i}'] = loss.item()
 
+        valid_loss = valid_loss/(step+1)
+        self.result['train_mean_loss'] = valid_loss.item()
         if self.epoch_metrics:  #F1Score
             for i,metric in enumerate(self.epoch_metrics):
                 metric(logits=self.outputs,target = self.targets,is_head = self.is_head)
@@ -528,11 +536,7 @@ class BioTrainer(Trainer):
                 for i in range(5):
                     logit = logits[i]
                     target = y[...,i]
-                    if i==0:
-                        loss = self.criterion(logits = logit,
-                                      target=target)
-                    else :
-                        loss += self.criterion(logits = logit,
+                    loss = self.criterion(logits = logit,
                                       target=target)
                     if step==0:
                         total_loss[i] = loss
@@ -542,13 +546,14 @@ class BioTrainer(Trainer):
             print(f"\n{'-'*25} train result : {'-'*25}")
             valid_loss =0
             for i in range(5):
-                loss = total_loss[i]
+                loss = total_loss[i]/(step+1)
                 self.result[f'loss{i}'] = loss.item()
                 if i==0 :
                     valid_loss=loss
                 else :
                     valid_loss+=loss
             valid_loss/=5
+
             self.result['valid_loss'] = valid_loss.item()
 
             print(f"\n{'-'*25} valid result {'-'*25}")

@@ -277,7 +277,7 @@ BIO_configs = {
     },
     'common':{
         'seed':1996,
-        'num_workers':0,
+        'num_workers':4,
         'n_gpu':[0],
 
     },
@@ -296,7 +296,7 @@ BIO_configs = {
         'epochs':3,
         'early_stop':None,
         'do_lower_case':True,
-        'batch_size':8,
+        'batch_size':12,
     },
     'Ner':['<PAD>', 'O','V','B-ARG0','I-ARG0','B-ARG1','I-ARG1','B-ARG2','I-ARG2'],
 

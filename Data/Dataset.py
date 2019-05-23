@@ -246,25 +246,28 @@ class BIODataset(Dataset):
         seq_len = len(input_ids)
 
         pos_v = l_tags.index('V')
-        pos_arg0 = l_tags.index('B-ARG0')
-        try:
+        if 'B-ARG0' in l_tags:
+            pos_arg0 = l_tags.index('B-ARG0')
+            for j in range(pos_arg0+1,seq_len+1):
+                if j<seq_len and l_tags[j] in ['B-ARG0','I-ARG0']:
+                    j+=1
+                    continue
+                else :
+                    pos_arg0_end =  j
+                    break
+        else:
+            pos_arg0 = pos_arg0_end =0
+        if 'B-ARG1' in l_tags:
             pos_arg1 = l_tags.index('B-ARG1')
-        except:
-            print('debug')
-        for j in range(pos_arg0+1,seq_len+1):
-            if j<seq_len and l_tags[j] in ['B-ARG0','I-ARG0']:
-                j+=1
-                continue
-            else :
-                pos_arg0_end =  j
-                break
-        for j in range(pos_arg1+1,seq_len+1):
-            if j<seq_len and l_tags[j] in ['B-ARG1','I-ARG1']:
-                j+=1
-                continue
-            else :
-                pos_arg1_end =  j
-                break
+            for j in range(pos_arg1+1,seq_len+1):
+                if j<seq_len and l_tags[j] in ['B-ARG1','I-ARG1']:
+                    j+=1
+                    continue
+                else :
+                    pos_arg1_end =  j
+                    break
+        else:
+            pos_arg1 = pos_arg1_end =0
         y = [pos_v,pos_arg0,pos_arg0_end,pos_arg1,pos_arg1_end]
 
         sentence = ' '.join(words)
