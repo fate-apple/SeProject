@@ -270,14 +270,14 @@ BIO_configs = {
     },
     'output':{
         'log_dir': BIO_Dir / 'output/log',
-        'checkpoint_dir' :  BIO_Dir/ "output/checkpoints/3",
+        'checkpoint_dir' :  BIO_Dir/ "output/checkpoints/4",
         'cache_dir':  BIO_Dir/ "output/model_cache",
         'figure_dir': BIO_Dir/ "output/fighre",
         'result': BIO_Dir / "output/result",
     },
     'common':{
         'seed':1996,
-        'num_workers':4,
+        'num_workers':0,
         'n_gpu':[0],
 
     },
@@ -296,7 +296,7 @@ BIO_configs = {
         'epochs':3,
         'early_stop':None,
         'do_lower_case':True,
-        'batch_size':12,
+        'batch_size':4,
     },
     'Ner':['<PAD>', 'O','V','B-ARG0','I-ARG0','B-ARG1','I-ARG1','B-ARG2','I-ARG2'],
 

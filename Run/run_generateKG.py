@@ -3,11 +3,11 @@
 @time: 2019/5/22 14:08
 @desc:
 '''
-from Data.Generator import EventCausalityKG_Generator
 from Config.BasicConfig import  ner_configs,Mnli_configs,BIO_configs
-from Pybert.model.nn.bert_finetune import Bert_Mnli_Finetune,Bert_Ner_Finetune
+from Pybert.model.nn.bert_finetune import Bert_Mnli_Finetune,Bert_Ner_Finetune,Bert_BIO_Finetune
 from Pybert.Predictor import MnliPredictor,NerPredictor,BIOPredictor
 from Pybert.utils.logger import *
+from Pybert.utils.utils import Causal_Cue_Words
 import wikipedia
 import pymongo
 import argparse
@@ -29,7 +29,7 @@ def extract_event(textA,ner_predictor,bio_predictor):
     event = {}
     _,output = ner_predictor.predict(textA)
     event['Ner'] = output
-    _,output,des   = bio_predictor.predict(textA)
+    _,output,des   = bio_predictor.predict_2(textA)
     event['Arg'] = output
     event['Des'] =des
     event['V'] = st.stem(output['V'])
@@ -94,9 +94,8 @@ def main():
                          )
 
     config = BIO_configs
-    model = Bert_Ner_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['bert_model_dir'],
-                                          cache_dir = config['output']['cache_dir'],
-                                          num_classes = len(config['Ner']))
+    model = Bert_BIO_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['bert_model_dir'],
+                                          cache_dir = config['output']['cache_dir'])
     bio_predicter = BIOPredictor(model = model,
                               logger = logger,
                               model_path = config['output']['checkpoint_dir'] / f"best_{config['model']['arch']}_model.pth",
@@ -131,7 +130,30 @@ def main():
 
     for i in tqdm.tqdm(range(len(sentences)-1)):
         textA = sentences[i]
+        for cueword in Causal_Cue_Words:
+            if cueword in textA:
+                textA,textB = textA.split(cueword,1)
+                EventA = extract_event(textA,ner_predicter,bio_predicter)
+                EventB = extract_event(textB,ner_predicter,bio_predicter)
+                _idA = EventCollection.find_one({'Ner':EventA['Ner'],'V':EventA['V']})
+                _idB = EventCollection.find_one({'Ner':EventB['Ner'],'V':EventB['V']})
+
+                if not  _idA:
+                    count+=1
+                    idA  = count
+                    EventCollection.insert_one({'_id':idA,'Ner':EventA['Ner'],'Arg':EventA['Arg'],'Des':EventA['Des']})
+                else:
+                    idA  =_idA['_id']
+                if not _idB:
+                    count+=1
+                    idB  = count
+                    EventCollection.insert_one({'_id':idB,'Ner':EventB['Ner'],'Arg':EventB['Arg'],'Des':EventB['Des']})
+                else:
+                    idB  =_idB['_id']
+                CausalityCollection.insert_one({'cause':idA,'caused':idB})
+                textA = textB
         textB = sentences[i+1]
+
         if is_causality(textA=textA,textB=textB,mnli_predictor=mnli_predicter):
             EventA = extract_event(textA,ner_predicter,bio_predicter)
             EventB = extract_event(textB,ner_predicter,bio_predicter)
@@ -152,7 +174,6 @@ def main():
                 idB  =_idB['_id']
             CausalityCollection.insert_one({'cause':idA,'caused':idB})
 
-#def preprocess(p):
 
 def test():
     os.chdir(os.path.pardir)
@@ -202,16 +223,15 @@ def test():
                          )
 
     config = BIO_configs
-    model = Bert_Ner_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['bert_model_dir'],
-                                          cache_dir = config['output']['cache_dir'],
-                                          num_classes = len(config['Ner']))
+    model = Bert_BIO_Finetune.from_pretrained(pretrained_model_name_or_path =config['model']['pretrained']['bert_model_dir'],
+                                          cache_dir = config['output']['cache_dir'])
     bio_predicter = BIOPredictor(model = model,
                               logger = logger,
                               model_path = config['output']['checkpoint_dir'] / f"best_{config['model']['arch']}_model.pth",
                               config=config,
                               criterion= None
                          )
-    test_str  ='[CLP] The United States Thursday blasted the release from a Greek prison of a Palestinian guerrilla convicted of bombing an airliner and killing a teenager in 1982 , saying the move " does not make sense . [SEP]'
+    test_str  ='The United States Thursday blasted the release from a Greek prison of a Palestinian guerrilla convicted of bombing an airliner and killing a teenager in 1982 , saying the move " does not make sense .'
     EventA = extract_event(test_str,ner_predicter,bio_predicter)
 
 if __name__ == '__main__':

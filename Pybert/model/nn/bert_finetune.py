@@ -119,7 +119,7 @@ class Bert_BIO_Finetune(BertPreTrainedModel):
         # to the first token.
 
         #Debug: Don't use 'input_ids=' , send to __call__ as **kwargs
-        encoded_layer,pooled_output = self.bert(input_ids,token_type_ids,attention_mask,
+        encoded_layer,_ = self.bert(input_ids,token_type_ids,attention_mask,
                                                 output_all_encoded_layers = False
                                                 )
         logits = self.output(encoded_layer)

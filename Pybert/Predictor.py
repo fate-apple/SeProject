@@ -406,6 +406,58 @@ class BIOPredictor(Predictor):
         #print(des)
         return logits,output,des
 
+    def predict_2(self,textA):
+        self.model.eval()
+        words = ['[CLS]']+textA.split()[:254]+['[SEP]']
+        with torch.no_grad():
+            batch =   self.PreprocessText(textA)
+            input_ids, token_type_ids, attention_mask,is_heads = batch
+            logits = self.model(input_ids, token_type_ids, attention_mask)
+            #v_logits,arg0_start_logits,arg0_end_logits,arg1_start_logits,arg1_end_logits = logits
+            pos_v,pos_arg0_s,pos_arg0_e,pos_arg1_s,pos_arg1_e  =tuple(logit.argmax(-1).item() for logit in logits)
+            is_heads = is_heads.view(-1).tolist()
+            input_ids = input_ids.view(-1).tolist()
+
+            #is_heads[0]=0
+            #is_heads[-1]=0
+            id_pos2word_pos = {}
+            count = 0
+            for i in range(len(input_ids)):
+                if is_heads[i]==1:
+                    id_pos2word_pos[i]=count
+                    count+=1
+                else:
+                    id_pos2word_pos[i]=-1
+            assert count==len(words)
+            output = {'V':'','ARG0':'','ARG1':''}
+            des = ''
+            index_v = id_pos2word_pos[pos_v]
+            output['V'] = words[index_v]
+            for i in range(pos_arg0_s,len(input_ids)):
+                if id_pos2word_pos[i]>0:
+                    for j in range(pos_arg0_e,len(input_ids)):
+                        if id_pos2word_pos[j]>0:
+                            output['ARG0'] = ' '.join(words[id_pos2word_pos[i]:id_pos2word_pos[j]])
+                            break
+                        else:
+                            j+=1
+                    break
+                else: i+=1
+            for i in range(pos_arg1_s,len(input_ids)):
+                if id_pos2word_pos[i]>0:
+                    for j in range(pos_arg1_e,len(input_ids)):
+                        if id_pos2word_pos[j]>0:
+                            output['ARG1'] = ' '.join(words[id_pos2word_pos[i]:id_pos2word_pos[j]])
+                            break
+                        else:
+                            j+=1
+                    break
+                else: i+=1
+
+
+        des = ' '.join([output['ARG0'],output['V'],output['ARG1']])
+        return logits,output,des
+
     def show_info(self,batch_id,n_batch):
         recv_per = int(100 * (batch_id + 1) / n_batch)
         show_bar = f"\r[predict]{batch_id+1}/{n_batch}[{int(self.width * recv_per / 100) * '>':<{self.width}s}]{recv_per}%"

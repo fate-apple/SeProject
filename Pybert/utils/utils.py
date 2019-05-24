@@ -164,7 +164,30 @@ def load_bert(model_path,model = None,optimizer = None):
         optimizer.load_state_dict(checkpoint['optimizer_state'])
     return [model,optimizer,best,start_epoch]
 
-
+Causal_Cue_Words = ['affected by','affect','affects',
+                    'and consequently','and hence',
+                    'as a consequence of','as a consequence','as a result of',
+                    'because of','because',
+                    'bring on','brings on','brought on',
+                    'cause','caused by','caused','causes','causing',
+                    'consequently',
+                    'decreased by','decrease','decreases',
+                    'due to',
+                    'effect of',
+                    'for this reson alone',
+                    'gave rise to','give rise to','given rise to','giving rise to',
+                    'hence',
+                    'in consequence of',
+                    'in reseponse to',
+                    'increase','increases','increased by',
+                    'induce','inducing','induced',
+                    'lead to','leading to','leads to','led to',
+                    'on account of',
+                    'owing to',
+                    'reason for','reason of','resons for','reasons of',
+                    'result from','resulting from','resulted from','results from',
+                    'so that',"that's why",'the result is',
+                    'thereby','therefor','thus']
         
 
 

@@ -244,6 +244,14 @@ class BIODataset(Dataset):
             l_tags.extend(tags)
         token_type_ids = None
         seq_len = len(input_ids)
+        '''
+        if seq_len>256:
+            tokenids = tokenids[:255]+tokenids[-1]
+            attention_mask = attention_mask[:255]+attention_mask[-1]
+            l_is_begin = l_is_begin[:255]+l_is_begin[-1]
+            l_tags = l_tags[:255]+l_tags[-1]
+        '''
+
 
         pos_v = l_tags.index('V')
         if 'B-ARG0' in l_tags:
@@ -256,7 +264,7 @@ class BIODataset(Dataset):
                     pos_arg0_end =  j
                     break
         else:
-            pos_arg0 = pos_arg0_end =0
+            pos_arg0 = pos_arg0_end =-1
         if 'B-ARG1' in l_tags:
             pos_arg1 = l_tags.index('B-ARG1')
             for j in range(pos_arg1+1,seq_len+1):
@@ -267,9 +275,43 @@ class BIODataset(Dataset):
                     pos_arg1_end =  j
                     break
         else:
-            pos_arg1 = pos_arg1_end =0
-        y = [pos_v,pos_arg0,pos_arg0_end,pos_arg1,pos_arg1_end]
+            pos_arg1 = pos_arg1_end =-1
+        if 'B-ARG2' in l_tags:
+            pos_arg2 = l_tags.index('B-ARG2')
+            for j in range(pos_arg2+1,seq_len+1):
+                if j<seq_len and l_tags[j] in ['B-ARG2','I-ARG2']:
+                    j+=1
+                    continue
+                else :
+                    pos_arg2_end =  j
+                    break
+        else:
+            pos_arg2 = pos_arg2_end =-1
 
+        if pos_arg0<0:
+            if pos_arg1>=0 and pos_arg2>=0:
+                pos_arg0,pos_arg0_end = pos_arg1,pos_arg1_end
+                pos_arg1,pos_arg1_end = pos_arg2,pos_arg2_end
+            #elif pos_arg1>=0:
+            else:
+                assert  pos_arg1>=0
+                pos_arg0,pos_arg0_end = pos_arg1,pos_arg1_end
+                pos_arg1,pos_arg1_end = len(input_ids)-1,len(input_ids)-1
+        elif pos_arg1<0 and pos_arg2>=0:
+            pos_arg1,pos_arg1_end = pos_arg2,pos_arg2_end
+        elif pos_arg1<0:
+            pos_arg1,pos_arg1_end = len(input_ids)-1,len(input_ids)-1
+        y = [pos_v,pos_arg0,pos_arg0_end,pos_arg1,pos_arg1_end]
+        '''
+        if pos_arg0!=0 and pos_arg0<pos_arg1:
+            y = [pos_v,pos_arg0,pos_arg0_end,pos_arg1,pos_arg1_end]
+        elif pos_arg0==0:
+            y = [pos_v,pos_arg1,pos_arg1_end,len(input_ids)-1,len(input_ids)-1]
+        elif pos_arg1<0:
+            y = [pos_v,pos_arg0,pos_arg0_end,len(input_ids)-1,len(input_ids)-1]
+        else:
+            y = [pos_v,pos_arg1,pos_arg1_end,pos_arg0,pos_arg0_end]
+        '''
         sentence = ' '.join(words)
         return input_ids,token_type_ids,attention_mask,y,l_is_begin,sentence,seq_len
 
