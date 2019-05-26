@@ -6,6 +6,16 @@
 import  re
 import numpy as np
 import torch
+import wikipedia
+wikipedia.set_lang("zh")
+try:
+        page =wikipedia.page('在上海的交通大学在1955年至1957年两个学年中分批迁往西安。')
+except wikipedia.exceptions.DisambiguationError as e :
+        print(e.options[0])
+        page = wikipedia.page(e.options[0])
+print(page.title)
+print(page.links)
+
 x = np.array([[1,2],[3,4],[5,6]])
 
 a = torch.FloatTensor([[[1,2,3,4],[5,6,7,8],[9,10,11,12]]])

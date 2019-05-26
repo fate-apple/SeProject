@@ -19,6 +19,7 @@ import jieba.posseg as pseg
 from pyltp import *
 import tqdm
 
+"""
 class LtpParser:
     def __init__(self):
         LTP_DIR = "./ltp_data"
@@ -78,7 +79,7 @@ class LtpParser:
         child_dict_list, format_parse_list = self.build_parse_child_dict(words, postags, arcs)
         roles_dict = self.format_labelrole(words, postags)
         return words, postags, child_dict_list, roles_dict, format_parse_list
-
+"""
 
 class CausalityExractor():
     def __init__(self,conn_event,conn_causality):
@@ -162,10 +163,10 @@ class CausalityExractor():
         '''
         verb1:牵动、导向、使动、导致、勾起、引入、指引、使、予以、产生、促成、造成、引导、造就、促使、酿成、
             引发、渗透、促进、引起、诱导、引来、促发、引致、诱发、推进、诱致、推动、招致、影响、致使、滋生、归于、
-            作用、使得、决定、攸关、令人、引出、浸染、带来、挟带、触发、关系、渗入、诱惑、波及、诱使
+            作用、使得、#决定、攸关、令人、引出、浸染、带来、挟带、触发、关系、渗入、诱惑、波及、诱使
         verb1_model:{Cause},<Verb|Adverb...>{Effect}
         '''
-        pattern = re.compile(r'(.*)\s+(牵动|已致|导向|使动|导致|勾起|引入|指引|使|予以|产生|促成|造成|引导|造就|促使|酿成|引发|渗透|促进|引起|诱导|引来|促发|引致|诱发|推进|诱致|推动|招致|影响|致使|滋生|归于|作用|使得|决定|攸关|令人|引出|浸染|带来|挟带|触发|关系|渗入|诱惑|波及|诱使)/[d|v]+\s(.*)')
+        pattern = re.compile(r'(.*)\s+(牵动|已致|导向|使动|导致|勾起|引入|指引|使|予以|产生|促成|造成|引导|造就|促使|酿成|引发|渗透|促进|引起|诱导|引来|促发|引致|诱发|推进|诱致|推动|招致|影响|致使|滋生|归于|作用|使得|攸关|令人|引出|浸染|带来|挟带|触发|关系|渗入|诱惑|波及|诱使)/[d|v]+\s(.*)')
         result = pattern.findall(sentence)
         data = dict()
         if result:
@@ -260,8 +261,8 @@ class CausalityExractor():
             infos.append(self.ruler2(sentence))
         elif self.ruler3(sentence):
             infos.append(self.ruler3(sentence))
-        #elif self.ruler4(sentence):
-        #    infos.append(self.ruler4(sentence))
+        elif self.ruler4(sentence):
+            infos.append(self.ruler4(sentence))
         elif self.ruler5(sentence):
             infos.append(self.ruler5(sentence))
         elif self.ruler6(sentence):
@@ -292,16 +293,17 @@ class CausalityExractor():
         return datas
 
     def process(self,content):
+        event_list=[]
         count = self.conn_event.find().count()
         sentences = self.process_content(content)
         for i,sentence in tqdm.tqdm(enumerate(sentences)):
-                sent = ' '.join([word.word + '/' + word.flag for word in pseg.cut(sentence)])
+                #sent = ' '.join([word.word + '/' + word.flag for word in pseg.cut(sentence)])
 
-                '''
+
             subsents = self.fined_sentence(sentence)
             for j,sent in enumerate(subsents):
                 sent = ' '.join([word.word + '/' + word.flag for word in pseg.cut(sent)])
-                '''
+
                 result = self.extract_triples(sent)
                 if result:
                     for data in result:
@@ -309,6 +311,7 @@ class CausalityExractor():
                             tripleA =''.join([word.split('/')[0] for word in data['cause'].split(' ') if word.split('/')[0]])
                             words, postags, child_dict_list, roles_dict, arcs = self.parser.parser_main(tripleA)
                             svoa = self.triple_ruler2(words, postags, child_dict_list, arcs, roles_dict)
+                            '''
                             if not svoa:
                                 break
                             tripleB =''.join([word.split('/')[0] for word in data['effect'].split(' ') if word.split('/')[0]])
@@ -331,8 +334,49 @@ class CausalityExractor():
                                 self.conn_event.insert_one({'_id':idB,'ARG0':svob[0],'V':svob[1],'ARG1':svob[2]})
                             else:
                                 idB  =_idB['_id']
-                            self.conn_causality.insert_one({'cause':idA,'effect':idB})
-        #return datas
+                            '''
+
+                            tripleB =''.join([word.split('/')[0] for word in data['effect'].split(' ') if word.split('/')[0]])
+                            words, postags, child_dict_list, roles_dict, arcs = self.parser.parser_main(tripleB)
+                            svob = self.triple_ruler2(words, postags, child_dict_list, arcs, roles_dict)
+                            if svoa:
+                                _idA = self.conn_event.find_one({'ARG0':svoa[0],'V':svoa[1],'ARG1':svoa[2]})
+                                desA = ' '.join(svoa)
+                            else:
+                                desA = tripleA
+                                _idA = self.conn_event.find_one({'des':desA})
+                            if svob:
+                                desB = ' '.join(svob)
+                                _idB = self.conn_event.find_one({'ARG0':svob[0],'V':svob[1],'ARG1':svob[2]})
+                            else:
+                                desB = tripleB
+                                _idB = self.conn_event.find_one({'des':tripleB})
+
+
+
+                            if not  _idA:
+                                count+=1
+                                idA = count
+                                if svoa:
+                                    self.conn_event.insert_one({'_id':idA,'ARG0':svoa[0],'V':svoa[1],'ARG1':svoa[0],'des':tripleA})
+                                else:
+                                    self.conn_event.insert_one({'_id':idA,'des':tripleA})
+                            else:
+                                idA  =_idA['_id']
+                            if not _idB:
+                                count+=1
+                                idB  = count
+                                if svob:
+                                    self.conn_event.insert_one({'_id':idB,'ARG0':svob[0],'V':svob[1],'ARG1':svob[2],'des':tripleB})
+                                else:
+                                    self.conn_event.insert_one({'_id':idB,'des':tripleB})
+                            else:
+                                idB  =_idB['_id']
+
+                            self.conn_causality.insert_one({'cause':idA,'effect':idB,'tag':''.join([word.split('/')[0] for word in data['tag'].split(' ') if word.split('/')[0]]),
+                                                            'des_cause':desA,'des_effect':desB})
+                            event_list.extend([desA,desB])
+        return event_list
 
     '''文章分句处理'''
     def process_content(self, content):
@@ -364,6 +408,7 @@ class CausalityExractor():
         return '4', []
 
     def triple_ruler2(self, words, postags, child_dict_list, arcs, roles_dict):
+        event_list =[]
         svos = []
         for index in range(len(postags)):
             tmp = 1
@@ -440,6 +485,146 @@ class CausalityExractor():
             svos += svo
 
         return svos
+class CreatePage:
+    def __init__(self):
+        self.base = '''
+    <html>
+    <head>
+      <script type="text/javascript" src="VIS/dist/vis.js"></script>
+      <link href="VIS/dist/vis.css" rel="stylesheet" type="text/css">
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    </head>
+    <body>
+
+    <div id="VIS_draw"></div>
+    <script type="text/javascript">
+      var nodes = data_nodes;
+      var edges = data_edges;
+
+      var container = document.getElementById("VIS_draw");
+
+      var data = {
+        nodes: nodes,
+        edges: edges
+      };
+
+      var options = {
+          nodes: {
+              shape: 'dot',
+              size: 25,
+              font: {
+                  size: 14
+              }
+          },
+          edges: {
+              font: {
+                  size: 14,
+                  align: 'middle'
+              },
+              color: 'gray',
+              arrows: {
+                  to: {enabled: true, scaleFactor: 0.5}
+              },
+              smooth: {enabled: false}
+          },
+          physics: {
+              enabled: true
+          }
+      };
+
+      var network = new vis.Network(container, data, options);
+
+    </script>
+    </body>
+    </html>
+    '''
+
+    '''生成数据'''
+    def collect_data(self, nodes, edges):
+        node_dict = {node:index for index, node in enumerate(nodes)}
+        data_nodes= []
+        data_edges = []
+        for node, id in node_dict.items():
+            data = {}
+            data["group"] = 'Event'
+            data["id"] = id
+            data["label"] = node
+            data_nodes.append(data)
+
+        for edge in edges:
+            data = {}
+            data['from'] = node_dict.get(edge[0])
+            data['label'] = edge[2]
+            data['to'] = node_dict.get(edge[1])
+            data_edges.append(data)
+        return data_nodes, data_edges
+
+    '''生成html文件'''
+    def create_html(self, data_nodes, data_edges,output_path):
+        if not output_path:
+            output_path ='a.out'
+        try:
+            f = open(output_path, 'w+',encoding='UTF-8')
+        except:
+            output_path ='a.out'
+            f = open(output_path, 'w+',encoding='UTF-8')
+        html = self.base.replace('data_nodes', str(data_nodes)).replace('data_edges', str(data_edges))
+        f.write(html)
+        f.close()
+        return output_path
+
+'''顺承关系图谱'''
+class EventGraph:
+    def __init__(self,conn_event,conn_causality):
+        self.conn_event = conn_event
+        self.conn_causality  =conn_causality
+
+    '''统计事件频次'''
+    def collect_events(self):
+        event_dict = {}
+        node_dict = {}
+        causalitys = self.conn_causality.find_many({})
+        for causality in causalitys:
+            cause,effect,tag = causality['des_cause'],causality['des_effect'],causality['tag']
+            for event in [cause,effect]:
+                if event not in event_dict:
+                    event_dict[event] = 1
+                else:
+                    event_dict[event] += 1
+
+        return event_dict, node_dict
+
+    '''过滤低频事件,构建事件图谱'''
+    def filter_events(self):
+        edges = []
+        causalitys = self.conn_causality.find({})
+        event_dict={}
+        for causality in causalitys:
+            cause,effect,tag = causality['des_cause'],causality['des_effect'],causality['tag']
+            for event in [cause,effect]:
+                if event not in event_dict:
+                    event_dict[event] = 1
+                else:
+                    event_dict[event] += 1
+            edges.append([cause,effect,tag])
+        events = [event for event,count in sorted(event_dict.items(), key=lambda asd: asd[1], reverse=True)[:300]]
+        for edge in edges:
+            if edge[0] not in events and edge[1] not in events:
+                    edges.remove(edge)
+        for edge in edges:
+            if edge[0] not in events:
+                events.append(edge[0])
+            if edge[1] not in events:
+                events.append(edge[1])
+        return events, edges
+
+    '''调用VIS插件,进行事件图谱展示'''
+    def show_graph(self, nodes,edges,output_path):
+        handler = CreatePage()
+        data_nodes, data_edges = handler.collect_data(nodes, edges)
+        output =handler.create_html(data_nodes, data_edges,output_path)
+        return output
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -453,24 +638,66 @@ def main():
                         default=None,
                         type=str,
                         help="start of the data")
+    parser.add_argument("--refresh",
+                        action='store_true',
+                        help="Set this flag if you are using an uncased model.")
+    parser.add_argument("--genData",
+                        action='store_true',
+                        help="whether clean collection")
+    parser.add_argument("--genGraph",
+                        default=None,
+                        type=str,
+                        help="whether clean collection")
     args = parser.parse_args()
 
-    EventCollection = pymongo.MongoClient().EcProject_cn.Event2
-    CausalityCollection = pymongo.MongoClient().EcProject_cn.Causality
-    count = EventCollection.find().count()
     device = f"cuda: 0"
     #----------------logger----------------
     logger = init_logger(log_name = 'generateKG',log_dir = 'log_dir')
     logger.info(f'device    :   {device}')
 
-    causalityExractor = CausalityExractor(conn_event=EventCollection,conn_causality=CausalityCollection)
-    wikipedia.set_lang("zh")
-    try:
-        page =wikipedia.page(args.startword)
-    except wikipedia.exceptions.DisambiguationError as e :
-        page = wikipedia.page(e.options[0])
-    content = page.content
-    causalityExractor.process(content)
+    EventCollection = pymongo.MongoClient().EcProject_cn.Event2
+    CausalityCollection = pymongo.MongoClient().EcProject_cn.Causality
+
+    if  args.refresh:
+        logger.info('refresh!')
+        EventCollection.delete_many({})
+        CausalityCollection.delete_many({})
+    count = EventCollection.find().count()
+
+    if args.genData:
+        logger.info('genData!')
+        causalityExractor = CausalityExractor(conn_event=EventCollection,conn_causality=CausalityCollection)
+        wikipedia.set_lang("zh")
+        work_list=[args.startword]
+        worked_list=[]
+        while(len(work_list)>0):
+            if(work_list[0] in worked_list):
+                work_list = work_list[1:]
+                continue
+            try:
+                page =wikipedia.page(work_list[0])
+            except wikipedia.exceptions.DisambiguationError as e :
+                page = wikipedia.page(e.options[0])
+            work_list = work_list[1:]
+            if(page.title in worked_list):
+                continue
+            logger.info(f'processing {page.title}')
+            content = page.content
+            event_list = causalityExractor.process(content)
+            logger.info(f'processed {page.title}')
+            work_list.extend(event_list)
+            worked_list.append(page.title)
+            if len(worked_list)>100:
+                break
+            logger.info(f"total process {len(worked_list)} page")
+        logger.info(f"total process {len(worked_list)} page:\n{' '.join(worked_list)}")
+    if args.genGraph:
+        logger.info('genGraph!')
+        handler = EventGraph(EventCollection,CausalityCollection)
+        nodes,edges = handler.filter_events()
+        output = handler.show_graph(nodes,edges, args.genGraph)
+        logger.info(f"generate graph output in path : {output}")
+
 
 if __name__ == '__main__':
     main()

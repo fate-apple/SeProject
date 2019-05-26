@@ -34,7 +34,8 @@ def extract_event(textA,ner_predictor,bio_predictor):
     event['Des'] =des
     event['V'] = st.stem(output['V'])
     l =event['Ner'].values()
-    print(f"raw : {textA}\n Ner : {' '.join([' '.join(i) for i in l])}   Des : {des}")
+    print(f"raw : {textA}\n Ner : {'-'.join([' '.join(i) for i in l])}   Arg0:{output['ARG0']}"
+          f"    V:{output['V']}   Arg1:{output['ARG1']}")
     return event
 
 def meet_ignore(str1,str2):
@@ -54,7 +55,6 @@ def main():
     parser.add_argument("--data",
                         default="wiki",
                         type=str,
-                        required=True,
                         help="choose raw data: wikipedia,")
     ## Other parameters
     parser.add_argument("--startword",
@@ -231,11 +231,12 @@ def test():
                               config=config,
                               criterion= None
                          )
-    test_str  ='The United States Thursday blasted the release from a Greek prison of a Palestinian guerrilla convicted of bombing an airliner and killing a teenager in 1982 , saying the move " does not make sense .'
-    EventA = extract_event(test_str,ner_predicter,bio_predicter)
+    test_str  ="The Ministry of Commerce assumed administration of the college in 1904, and in 1905 changed the college's name to Imperial Polytechnic College of the Commerce Ministry. In 1906, the college was placed under the Ministry of Posts and Telegraphs, and its name was changed to Shanghai Industrial College of the Ministry of Posts and Telegraphs. When the Republic of China was founded, the college was placed under the Ministry of Communications and its name was once again changed, this time to Government Institute of Technology of the Communications Ministry."
+    for sentence in test_str.split('.'):
+        EventA = extract_event(sentence,ner_predicter,bio_predicter)
 
 if __name__ == '__main__':
-    main()
+    test()
 
 
 
