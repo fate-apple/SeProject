@@ -157,6 +157,7 @@ def load_bert(model_path,model = None,optimizer = None):
     state_dict = checkpoint['model_state']
 
     best = checkpoint['best']
+    print(f"target  :   {best}")
     start_epoch = checkpoint['epoch'] + 1
     if model:
         model.load_state_dict(state_dict)

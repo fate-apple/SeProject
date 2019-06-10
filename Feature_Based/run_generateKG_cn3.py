@@ -9,7 +9,7 @@ their  Author is : lhy<lhy_in_blcu@126.com,https://huangyong.github.io>
 '''
 
 from Feature_Based.sentence_parser import  *
-
+import json
 import  argparse
 import pymongo
 from Pybert.utils.logger import *
@@ -474,16 +474,7 @@ class CausalityExractor():
 
         return prefix + words[word_index] + postfix
 
-    '''程序主控函数'''
-    def triples_main(self, content):
-        sentences = self.split_sents(content)
-        svos = []
-        for sentence in sentences:
-            words, postags, child_dict_list, roles_dict, arcs = self.parser.parser_main(sentence)
-            svo = self.triple_ruler2(words, postags, child_dict_list, arcs, roles_dict)
-            svos += svo
 
-        return svos
 class CreatePage:
     def __init__(self):
         self.base = '''
@@ -674,41 +665,63 @@ def main():
     if args.genData:
         logger.info('genData!')
         causalityExractor = CausalityExractor(conn_event=EventCollection,conn_causality=CausalityCollection)
-        wikipedia.set_lang("zh")
-        work_list=[args.startword]
-        worked_list=[]
-        while(len(work_list)>0):
-            if(work_list[0] in worked_list):
+        if args.data=='wiki':
+
+            wikipedia.set_lang("zh")
+            work_list=[args.startword]
+            worked_list=[]
+            while(len(work_list)>0):
+                if(work_list[0] in worked_list):
+                    work_list = work_list[1:]
+                    continue
+                try:
+                    page =wikipedia.page(work_list[0])
+                except wikipedia.exceptions.DisambiguationError as e :
+                    page = wikipedia.page(e.options[0])
+                except:
+                    work_list = work_list[1:]
+                    continue
                 work_list = work_list[1:]
-                continue
-            try:
-                page =wikipedia.page(work_list[0])
-            except wikipedia.exceptions.DisambiguationError as e :
-                page = wikipedia.page(e.options[0])
-            except:
-                work_list = work_list[1:]
-                continue
-            work_list = work_list[1:]
-            if(page.title in worked_list):
-                continue
-            logger.info(f'processing {page.title}')
-            content = page.content
-            event_list = causalityExractor.process(content)
-            logger.info(f'processed {page.title}')
-            if len(work_list)<args.pages:
-                work_list.extend(event_list)
-            worked_list.append(page.title)
-            if len(worked_list)>args.pages:
-                break
-            logger.info(f"total process {len(worked_list)} page")
-        logger.info(f"total process {len(worked_list)} page:\n{' '.join(worked_list)}")
+                if(page.title in worked_list):
+                    continue
+                logger.info(f'processing {page.title}')
+                content = page.content
+                event_list = causalityExractor.process(content)
+                logger.info(f'processed {page.title}')
+                if len(work_list)<args.pages:
+                    work_list.extend(event_list)
+                worked_list.append(page.title)
+                if len(worked_list)>args.pages:
+                    break
+                logger.info(f"total process {len(worked_list)} page")
+            logger.info(f"total process {len(worked_list)} page:\n{' '.join(worked_list)}")
+        elif args.data=='PeopleDaily':
+            fr = open('../PeopleDaily/news2016zh_train.json','r',encoding='utf-8')
+
+            for i in tqdm.trange(args.pages):
+                line = fr.readline()
+                if len(line)>0:
+                    example =  json.loads(line)
+                    content = example['content']
+                    causalityExractor.process(content)
+                else :
+                    break
+
+            '''
+            examples  = json.loads(fr.read())
+            for example in tqdm.tqdm(examples):
+                causalityExractor.process_content(example['desc'])
+            '''
+
+
+
     if args.genGraph:
         if args.genGraph=='default':
             if args.data=='wiki':
                 output_path = '_'.join([args.data,str(args.pages),args.startword,
                                         str(args.nodes)])+'.html'
             if args.data=='PeopleDaily':
-                output_path = '_'.join([args.data,
+                output_path = '_'.join([args.data,str(args.pages),
                                         str(args.nodes)])+'.html'
         else:
             output_path = args.genGraph

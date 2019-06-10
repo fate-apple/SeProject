@@ -213,11 +213,10 @@ Mnli_configs = {
     },
     'data':{
         'source_path' : Mnli_Dir / 'dataset/raw/multinli_1.0_temp.jsonl',
-        #'target_path' : Mnli_Dir / 'dataset/raw/target_BIO_2014_cropus.txt',
         'train_path' :Mnli_Dir / 'dataset/processed/multinli_train.jsonl',
         'valid_path' :Mnli_Dir / 'dataset/processed/multinli_valid.jsonl',
         #'test_path' :Mnli_Dir / 'dataset/raw/multinli_1.0_dev_matched.jsonl',
-        'test_path' :Mnli_Dir / 'dataset/raw/multinli_1.0_temp.jsonl',
+        'test_path' :Mnli_Dir / 'dataset/raw/multinli_1.0_dev_mismatched.jsonl',
 
 
 
